@@ -100,7 +100,57 @@ class FFM_Layer(Layer):
         # field second order
         second_order = 0
         latent_vector = tf.reduce_sum(tf.nn.embedding_lookup(self.v, inputs), axis=1)  # (batch_size, field_num, k)
+        # 因为每个样本的field只有一个值，因此这个数据集的field second order就是两两field的内积
         for i in range(self.field_num):
             for j in range(i + 1, self.field_num):
                 second_order += tf.reduce_sum(latent_vector[:, i] * latent_vector[:, j], axis=1, keepdims=True)
         return first_order + second_order
+
+
+class MLP(Layer):
+    def __init__(self, hidden_units, activation='relu', dnn_dropout=0., use_batch_norm=False):
+        """Multilayer Perceptron.
+        Args:
+            :param hidden_units: A list. The list of hidden layer units's numbers.
+            :param activation: A string. The name of activation function, like 'relu', 'sigmoid' and so on.
+            :param dnn_dropout: A scalar. The rate of dropout .
+            :param use_batch_norm: A boolean. Whether using batch normalization or not.
+        :return:
+        """
+        super(MLP, self).__init__()
+        self.dnn_network = [Dense(units=unit, activation=activation) for unit in hidden_units]
+        self.dropout = Dropout(dnn_dropout)
+        self.use_batch_norm = use_batch_norm
+        self.bt = BatchNormalization()
+
+    def call(self, inputs):
+        x = inputs
+        for dnn in self.dnn_network:
+            x = dnn(x)
+        if self.use_batch_norm:
+            x = self.bt(x)
+        x = self.dropout(x)
+        return x
+
+
+class Linear(Layer):
+    def __init__(self, feature_length, w_reg=1e-6):
+        """Linear Part.
+        Args:
+            :param feature_length: A scalar. The length of features.
+            :param w_reg: A scalar. The regularization coefficient of parameter w.
+        :return:
+        """
+        super(Linear, self).__init__()
+        self.feature_length = feature_length
+        self.w_reg = w_reg
+
+    def build(self, input_shape):
+        self.w = self.add_weight(name="w",
+                                 shape=(self.feature_length, 1),
+                                 regularizer=l2(self.w_reg),
+                                 trainable=True)
+
+    def call(self, inputs):
+        result = tf.reduce_sum(tf.nn.embedding_lookup(self.w, inputs), axis=1)  # (batch_size, 1)
+        return result

@@ -175,3 +175,46 @@ class Residual_Units(Layer):
 
         outputs = self.relu(x + inputs)
         return outputs
+
+class CrossNetwork(Layer):
+    def __init__(self, layer_num, reg_w=0., reg_b=0.):
+        """CrossNetwork.
+        Args:
+            :param layer_num: A scalar. The depth of cross network.
+            :param reg_w: A scalar. The regularization coefficient of w.
+            :param reg_b: A scalar. The regularization coefficient of b.
+        :return:
+        """
+        super(CrossNetwork, self).__init__()
+        self.layer_num = layer_num
+        self.reg_w = reg_w
+        self.reg_b = reg_b
+
+    def build(self, input_shape):
+        dim = int(input_shape[-1])
+        self.cross_weights = [
+            self.add_weight(name='w_' + str(i),
+                            shape=(dim, 1),
+                            initializer='random_normal',
+                            regularizer=l2(self.reg_w),
+                            trainable=True
+                            )
+            for i in range(self.layer_num)]
+        self.cross_bias = [
+            self.add_weight(name='b_' + str(i),
+                            shape=(dim, 1),
+                            initializer='random_normal',
+                            regularizer=l2(self.reg_b),
+                            trainable=True
+                            )
+            for i in range(self.layer_num)]
+
+    def call(self, inputs):
+        x_0 = tf.expand_dims(inputs, axis=2)  # (batch_size, dim, 1)
+        x_l = x_0  # (None, dim, 1)
+        for i in range(self.layer_num):
+            x_l1 = tf.tensordot(x_l, self.cross_weights[i], axes=[1, 0])  # (batch_size, 1, 1)
+            print(x_l1)
+            x_l = tf.matmul(x_0, x_l1) + self.cross_bias[i] + x_l  # (batch_size, dim, 1)
+        x_l = tf.squeeze(x_l, axis=2)  # (batch_size, dim)
+        return x_l

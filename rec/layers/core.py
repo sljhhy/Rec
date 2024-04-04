@@ -154,3 +154,24 @@ class Linear(Layer):
     def call(self, inputs):
         result = tf.reduce_sum(tf.nn.embedding_lookup(self.w, inputs), axis=1)  # (batch_size, 1)
         return result
+
+class Residual_Units(Layer):
+    def __init__(self, hidden_unit, dim_stack):
+        """Residual Units.
+        Args:
+            :param hidden_unit: A list. Neural network hidden units.
+            :param dim_stack: A scalar. The dimension of inputs unit.
+        :return:
+        """
+        super(Residual_Units, self).__init__()
+        self.layer1 = Dense(units=hidden_unit, activation='relu')
+        self.layer2 = Dense(units=dim_stack, activation=None)
+        self.relu = ReLU()
+
+    def call(self, inputs):
+        x = inputs
+        x = self.layer1(x)
+        x = self.layer2(x)
+
+        outputs = self.relu(x + inputs)
+        return outputs

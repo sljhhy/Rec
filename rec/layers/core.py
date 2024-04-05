@@ -218,3 +218,39 @@ class CrossNetwork(Layer):
             x_l = tf.matmul(x_0, x_l1) + self.cross_bias[i] + x_l  # (batch_size, dim, 1)
         x_l = tf.squeeze(x_l, axis=2)  # (batch_size, dim)
         return x_l
+
+
+class New_FM(Layer):
+    def __init__(self, feature_length, w_reg=1e-6):
+        """New Factorization Machine for DeepFm.
+        Note. In DeepFM, only the first order feature and second order feature intersect are included.
+        Args:
+            :param feature_length: A scalar. The length of features.
+            :param w_reg: A scalar. The regularization coefficient of parameter w.
+        :return:
+        """
+        super(New_FM, self).__init__()
+        self.feature_length = feature_length
+        self.w_reg = w_reg
+
+    def build(self, input_shape):
+        self.w = self.add_weight(name='w', shape=(self.feature_length, 1),
+                                 initializer='random_normal',
+                                 regularizer=l2(self.w_reg),
+                                 trainable=True)
+
+    def call(self, inputs, **kwargs):
+        """
+        :param inputs: A dict with shape `(batch_size, {'sparse_inputs', 'embed_inputs'})`:
+          sparse_inputs is 2D tensor with shape `(batch_size, sum(field_num))`
+          embed_inputs is 3D tensor with shape `(batch_size, fields, embed_dim)`
+        """
+        sparse_inputs, embed_inputs = inputs['sparse_inputs'], inputs['embed_inputs']
+        sparse_inputs = tf.concat([value for _, value in sparse_inputs.items()], axis=-1)
+        # first order
+        first_order = tf.reduce_sum(tf.nn.embedding_lookup(self.w, sparse_inputs), axis=1)  # (batch_size, 1)
+        # second order
+        square_sum = tf.square(tf.reduce_sum(embed_inputs, axis=1, keepdims=True))  # (batch_size, 1, embed_dim)
+        sum_square = tf.reduce_sum(tf.square(embed_inputs), axis=1, keepdims=True)  # (batch_size, 1, embed_dim)
+        second_order = 0.5 * tf.reduce_sum(square_sum - sum_square, axis=2)  # (batch_size, 1)
+        return first_order + second_order

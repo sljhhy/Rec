@@ -5,3 +5,4 @@ from rec.layers.core import MLP
 from rec.layers.core import Residual_Units
 from rec.layers.core import CrossNetwork
 from rec.layers.core import New_FM
+from rec.layers.core import CIN
